@@ -60,6 +60,16 @@ RSpec.describe Legion::Extensions::ConceptualBlending::Helpers::BlendingEngine d
         engine.add_relation_to_space(space_id: 'bad-id', from: 'a', to: 'b', type: :x)
       end.to raise_error(ArgumentError, /not found/)
     end
+
+    it 'raises ArgumentError when MAX_MAPPINGS is reached' do
+      space = engine.create_space(name: 's', domain: 'd')
+      stub_const('Legion::Extensions::ConceptualBlending::Helpers::Constants::MAX_MAPPINGS', 2)
+      engine.add_relation_to_space(space_id: space.id, from: 'a', to: 'b', type: :x)
+      engine.add_relation_to_space(space_id: space.id, from: 'b', to: 'c', type: :y)
+      expect do
+        engine.add_relation_to_space(space_id: space.id, from: 'c', to: 'd', type: :z)
+      end.to raise_error(ArgumentError, /Max mappings/)
+    end
   end
 
   describe '#blend' do
@@ -194,6 +204,41 @@ RSpec.describe Legion::Extensions::ConceptualBlending::Helpers::BlendingEngine d
       blend.instance_variable_set(:@strength, 0.05)
       engine.prune_weak
       expect(engine.to_h[:blends_count]).to eq(0)
+    end
+  end
+
+  describe '#history' do
+    it 'records create_space events' do
+      engine.create_space(name: 'test', domain: 'misc')
+      expect(engine.history.last[:operation]).to eq(:create_space)
+    end
+
+    it 'records blend events' do
+      engine.blend(space_a_id: space_a.id, space_b_id: space_b.id)
+      expect(engine.history.last[:operation]).to eq(:blend)
+    end
+
+    it 'records elaborate events' do
+      blend = engine.blend(space_a_id: space_a.id, space_b_id: space_b.id)
+      engine.elaborate_blend(blend_id: blend.id, emergent_property: 'new_prop')
+      expect(engine.history.last[:operation]).to eq(:elaborate)
+    end
+
+    it 'records compress events' do
+      blend = engine.blend(space_a_id: space_a.id, space_b_id: space_b.id)
+      engine.compress_blend(blend_id: blend.id, removed_element: 'virus')
+      expect(engine.history.last[:operation]).to eq(:compress)
+    end
+
+    it 'enforces MAX_HISTORY cap' do
+      stub_const('Legion::Extensions::ConceptualBlending::Helpers::Constants::MAX_HISTORY', 3)
+      5.times { |i| engine.create_space(name: "s#{i}", domain: 'd') }
+      expect(engine.history.size).to eq(3)
+    end
+
+    it 'returns a copy (not the internal array)' do
+      engine.create_space(name: 'test', domain: 'misc')
+      expect(engine.history).not_to be(engine.instance_variable_get(:@history))
     end
   end
 

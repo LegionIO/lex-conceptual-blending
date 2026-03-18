@@ -10,6 +10,7 @@ module Legion
           def initialize
             @spaces  = {}
             @blends  = {}
+            @history = []
           end
 
           def create_space(name:, domain:)
@@ -17,6 +18,7 @@ module Legion
 
             space = MentalSpace.new(name: name, domain: domain)
             @spaces[space.id] = space
+            record_history(:create_space, space_id: space.id, name: name)
             space
           end
 
@@ -26,6 +28,8 @@ module Legion
           end
 
           def add_relation_to_space(space_id:, from:, to:, type:)
+            raise ArgumentError, "Max mappings (#{MAX_MAPPINGS}) reached" if total_relations >= MAX_MAPPINGS
+
             space = @spaces.fetch(space_id) { raise ArgumentError, "Space #{space_id} not found" }
             space.add_relation(from: from, to: to, type: type)
           end
@@ -52,17 +56,22 @@ module Legion
               blend_type:       blend_type
             )
             @blends[b.id] = b
+            record_history(:blend, blend_id: b.id, blend_type: blend_type)
             b
           end
 
           def elaborate_blend(blend_id:, emergent_property:)
             blend = @blends.fetch(blend_id) { raise ArgumentError, "Blend #{blend_id} not found" }
-            blend.elaborate(emergent_property: emergent_property)
+            result = blend.elaborate(emergent_property: emergent_property)
+            record_history(:elaborate, blend_id: blend_id, property: emergent_property)
+            result
           end
 
           def compress_blend(blend_id:, removed_element:)
             blend = @blends.fetch(blend_id) { raise ArgumentError, "Blend #{blend_id} not found" }
-            blend.compress(removed_element: removed_element)
+            result = blend.compress(removed_element: removed_element)
+            record_history(:compress, blend_id: blend_id, element: removed_element)
+            result
           end
 
           def find_blends(domain:)
@@ -107,15 +116,29 @@ module Legion
             before - @blends.size
           end
 
+          def history
+            @history.dup
+          end
+
           def to_h
             {
-              spaces_count: @spaces.size,
-              blends_count: @blends.size,
-              best_quality: @blends.values.map(&:quality_score).max || 0.0
+              spaces_count:  @spaces.size,
+              blends_count:  @blends.size,
+              history_count: @history.size,
+              best_quality:  @blends.values.map(&:quality_score).max || 0.0
             }
           end
 
           private
+
+          def total_relations
+            @spaces.values.sum { |s| s.relations.size }
+          end
+
+          def record_history(operation, details = {})
+            @history << { operation: operation, at: Time.now.utc }.merge(details)
+            @history.shift while @history.size > MAX_HISTORY
+          end
 
           def extract_generic_space(space_a, space_b)
             types_a = space_a.relations.to_set { |r| r[:type] }

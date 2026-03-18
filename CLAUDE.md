@@ -3,7 +3,7 @@
 **Level 3 Leaf Documentation**
 - **Parent**: `/Users/miverso2/rubymine/legion/extensions-agentic/CLAUDE.md`
 - **Gem**: `lex-conceptual-blending`
-- **Version**: 0.1.0
+- **Version**: 0.1.1
 - **Namespace**: `Legion::Extensions::ConceptualBlending`
 
 ## Purpose
@@ -39,8 +39,8 @@ lib/legion/extensions/conceptual_blending/
 |---|---|---|
 | `MAX_SPACES` | 200 | Hard cap; `ArgumentError` on create when full |
 | `MAX_BLENDS` | 100 | Hard cap; `ArgumentError` on blend when full |
-| `MAX_MAPPINGS` | 500 | Defined, not enforced |
-| `MAX_HISTORY` | 300 | Defined, not enforced |
+| `MAX_MAPPINGS` | 500 | Total relations across all spaces; `ArgumentError` on add when full |
+| `MAX_HISTORY` | 300 | Operation history cap; oldest entries evicted when full |
 | `DEFAULT_STRENGTH` | 0.5 | Starting strength for new blends |
 | `ELABORATION_BOOST` | 0.15 | Strength increase per `elaborate` call |
 | `COMPRESSION_PENALTY` | 0.1 | Strength decrease per `compress` call |
